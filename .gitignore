@@ -1,0 +1,8 @@
+node_modules/
+release/
+electron-runtime.zip
+/preview.png
+*.log
+build-cache/
+build-tools/
+*.zip
