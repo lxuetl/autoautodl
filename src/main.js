@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,ipcMain,safeStorage,session,shell,Notification,Tray,Menu,nativeImage} = require('electron');
+const {app,BrowserWindow,ipcMain,safeStorage,session,shell,Notification,Tray,Menu,nativeImage,clipboard} = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const core = require('./core');
@@ -31,6 +31,7 @@ async function openRentWorkspace(){
 let state={demo,connected:false,watching:false,auto:false,target:'',instances:[],markets:[],logs:[],pending:null,updated:null,settings:{seconds:45,count:1,gpu:'RTX 4090',region:''}};
 const file=()=>path.join(app.getPath('userData'),'profile.json');
 let availabilityKey='';
+let stockWarningKey='';
 function persist(){
   if(demo)return;
   const sealed=token ? safeStorage.encryptString(token).toString('base64') : '';
@@ -79,6 +80,11 @@ async function refresh(){
       const machines=await pages('/user/machine/list',body);
       if(run!==generation)return;
       state.markets=machines.map(core.stock); // 原始响应和实例密码不发送给界面
+      const unknown=state.markets.filter(m=>m.idle===null);
+      state.stockDiagnostics={version:app.getVersion(),records:state.markets.length,unknown:unknown.length,schemas:[...new Set(unknown.map(m=>m.schema.join(', ')))].slice(0,5)};
+      const warningKey=JSON.stringify(state.stockDiagnostics.schemas);
+      if(unknown.length&&warningKey!==stockWarningKey)log(`${unknown.length} 条主机库存格式未知，已禁止据此自动开机；可复制库存诊断反馈`);
+      stockWarningKey=warningKey;
       const available=selected?state.markets.filter(m=>m.id===selected.machine&&m.idle>=selected.count):state.markets.filter(m=>m.idle>=state.settings.count);
       const key=available.map(m=>m.id).sort().join(',');
       if(state.watching&&key&&key!==availabilityKey){log('发现符合条件的空闲 GPU');notify('发现符合条件的空闲 GPU，请查看监控台');}
@@ -175,6 +181,7 @@ app.whenReady().then(()=>{
       else if(action==='clearPending'){if(state.watching)throw new Error('请先停止监控');state.pending=null;persist();log('已手动确认上次请求结果');}
       else if(action==='market')await shell.openExternal('https://www.autodl.com/market/list');
       else if(action==='rentWorkspace')await openRentWorkspace();
+      else if(action==='copyStockDiagnostics'){clipboard.writeText(JSON.stringify(state.stockDiagnostics||{message:'请先刷新数据'},null,2));log('已复制库存诊断（仅记录数、字段名和类型，不含字段值或登录凭据）');}
       else if(action==='instances')await shell.openExternal('https://www.autodl.com/console/instance/list');
       emit();return {ok:true};
     }catch(e){log(e.message);return {error:e.message};}

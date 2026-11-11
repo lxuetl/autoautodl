@@ -6,12 +6,14 @@ function render(s){current=s;$('connection').textContent=s.connected?'已连接�
   $('target').replaceChildren(new Option('不选实例：按租机条件监控',''),...s.instances.map(i=>new Option(i.name+' · '+i.gpu,i.id)));$('target').value=s.target;
   $('logs').replaceChildren(...s.logs.map(l=>{const row=text('div',l.message);row.className='log';row.prepend(text('time',l.time));return row;}));
   $('instanceList').replaceChildren(...s.instances.map(i=>{const card=document.createElement('article'),details=document.createElement('div');details.append(text('small',i.id),text('h2',i.name),text('p',`${i.gpu} × ${i.count} · ${i.regionName} · ${i.status}`));const button=text('button','监控此实例');button.onclick=async()=>{await call('target',i.id);switchTab('dashboard');};card.append(details,button);return card;}));
-  $('marketList').replaceChildren(...s.markets.map(m=>{const card=document.createElement('article');card.append(text('h2',m.gpu||m.id),text('p',`${m.region} · 主机 ${m.id} · 空闲 ${m.idle} 卡`));return card;}));
+  const unknown=s.markets.filter(m=>m.idle===null).length;
+  if(unknown)$('nStock').textContent=`${s.markets.reduce((n,m)=>n+(m.idle??0),0)}（${unknown} 条未知）`;
+  $('marketList').replaceChildren(...s.markets.map(m=>{const card=document.createElement('article');card.append(text('h2',m.gpu||m.id),text('p',`${m.region} · 主机 ${m.id} · 空闲 ${m.idle===null?'未知':m.idle+' 卡'}`));return card;}));
   for(const id of ['instanceList','marketList'])if(!$(id).children.length)$(id).append(text('p','暂无数据，请连接账号并刷新。'));
 }
 function switchTab(name){tab=name;document.querySelectorAll('.tab').forEach(el=>el.hidden=el.id!==name);document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));$('heading').textContent={dashboard:'监控台',instances:'我的实例',market:'租机候补',settings:'设置'}[name];}
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-for(const [id,action] of Object.entries({login:'login',logout:'logout',refresh:'refresh',stop:'stop',marketLink:'market',rentWorkspace:'rentWorkspace',officialInstances:'instances',verify:'instances'}))$(id).onclick=()=>call(action);
+for(const [id,action] of Object.entries({login:'login',logout:'logout',refresh:'refresh',stop:'stop',marketLink:'market',rentWorkspace:'rentWorkspace',officialInstances:'instances',verify:'instances',copyStockDiagnostics:'copyStockDiagnostics'}))$(id).onclick=()=>call(action);
 $('target').onchange=()=>call('target',$('target').value);
 $('startAuto').onclick=()=>{if(confirm('确认对所选实例启用自动有卡开机？开机后会按平台规则计费。'))call('start',true);};
 $('startWatch').onclick=()=>call('start',false);

@@ -10,12 +10,17 @@ function instance(raw) {
   return {id, name:String(raw.name || raw.instance_name || id), status:String(raw.status || raw.instance_status || 'unknown'), machine:String(raw.machine_id || ''), gpu:String(raw.gpu_type_name || raw.snapshot_gpu_type_name || raw.gpu_name || ''), count:Number(raw.req_gpu_amount ?? raw.gpu_num ?? 1), region:String(raw.region_sign || ''), regionName:String(raw.region_name || raw.region_sign || ''), charge:String(raw.charge_type || '')};
 }
 function stock(raw) {
-  const idle = Number(raw.gpu_idle_num ?? raw.idle_gpu_num ?? raw.gpu_idle_count);
-  if (!Number.isInteger(idle) || idle < 0) throw new Error('库存字段无法识别');
-  return {id:String(raw.machine_id || raw.machine_uuid || raw.id || ''), idle, gpu:String(raw.gpu_type_name || raw.gpu_name || ''), region:String(raw.region_name || raw.region_sign || '')};
+  raw = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const counts = ['gpu_idle_num','idle_gpu_num','gpu_idle_count'].map(key => raw[key])
+    .filter(value => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
+      || (typeof value === 'string' && /^\d+$/.test(value) && Number.isSafeInteger(Number(value))))
+    .map(Number);
+  const idle = counts.length && new Set(counts).size === 1 ? counts[0] : null;
+  return {id:String(raw.machine_id || raw.machine_uuid || raw.id || ''), idle, gpu:String(raw.gpu_type_name || raw.gpu_name || ''), region:String(raw.region_name || raw.region_sign || ''),
+    schema:Object.keys(raw).sort().slice(0,80).map(key=>key.slice(0,80)+':'+(raw[key]===null?'null':Array.isArray(raw[key])?'array':typeof raw[key]))};
 }
 function canStart(item, available) {
-  return ['shutdown','stopped','poweroff','power_off'].includes(item.status) && Number.isInteger(item.count) && item.count > 0 && available.id === item.machine && available.idle >= item.count;
+  return ['shutdown','stopped','poweroff','power_off'].includes(item.status) && Number.isInteger(item.count) && item.count > 0 && !!item.machine && available.id === item.machine && Number.isSafeInteger(available.idle) && available.idle >= item.count;
 }
 function settings(input) {
   const seconds = Number(input.seconds), count = Number(input.count);
