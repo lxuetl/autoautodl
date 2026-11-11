@@ -81,9 +81,11 @@ async function refresh(){
       if(run!==generation)return;
       state.markets=machines.map(core.stock); // 原始响应和实例密码不发送给界面
       const unknown=state.markets.filter(m=>m.idle===null);
-      state.stockDiagnostics={version:app.getVersion(),records:state.markets.length,unknown:unknown.length,schemas:[...new Set(unknown.map(m=>m.schema.join(', ')))].slice(0,5)};
-      const warningKey=JSON.stringify(state.stockDiagnostics.schemas);
-      if(unknown.length&&warningKey!==stockWarningKey)log(`${unknown.length} 条主机库存格式未知，已禁止据此自动开机；可复制库存诊断反馈`);
+      state.stockDiagnostics=core.stockDiagnostics(state.markets,app.getVersion());
+      const warningKey=JSON.stringify([state.stockDiagnostics.schemas,state.stockDiagnostics.reasons]);
+      const reasonLabels={negative:'负库存',fractional:'非整数',out_of_range:'超出有效范围',non_finite:'非有限数',missing:'缺少字段',invalid_type:'类型异常',conflicting:'字段冲突'};
+      const reasons=Object.entries(state.stockDiagnostics.reasons).map(([key,count])=>`${reasonLabels[key]||key} ${count} 条`).join('，');
+      if(unknown.length&&warningKey!==stockWarningKey)log(`同步完成：${state.stockDiagnostics.known} 条库存正常，${unknown.length} 条暂不可确认（${reasons}）；异常库存不参与自动开机`);
       stockWarningKey=warningKey;
       const available=selected?state.markets.filter(m=>m.id===selected.machine&&m.idle>=selected.count):state.markets.filter(m=>m.idle>=state.settings.count);
       const key=available.map(m=>m.id).sort().join(',');

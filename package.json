@@ -1,6 +1,6 @@
 {
   "name": "autodl-companion",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "AutoDL 实例与 GPU 库存助手",
   "author": "Local project",

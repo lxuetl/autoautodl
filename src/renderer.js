@@ -8,7 +8,8 @@ function render(s){current=s;$('connection').textContent=s.connected?'已连接�
   $('instanceList').replaceChildren(...s.instances.map(i=>{const card=document.createElement('article'),details=document.createElement('div');details.append(text('small',i.id),text('h2',i.name),text('p',`${i.gpu} × ${i.count} · ${i.regionName} · ${i.status}`));const button=text('button','监控此实例');button.onclick=async()=>{await call('target',i.id);switchTab('dashboard');};card.append(details,button);return card;}));
   const unknown=s.markets.filter(m=>m.idle===null).length;
   if(unknown)$('nStock').textContent=`${s.markets.reduce((n,m)=>n+(m.idle??0),0)}（${unknown} 条未知）`;
-  $('marketList').replaceChildren(...s.markets.map(m=>{const card=document.createElement('article');card.append(text('h2',m.gpu||m.id),text('p',`${m.region} · 主机 ${m.id} · 空闲 ${m.idle===null?'未知':m.idle+' 卡'}`));return card;}));
+  const issues={negative:'平台上报负库存',fractional:'平台上报非整数',out_of_range:'数值超出有效范围',non_finite:'数值非有限',missing:'字段缺失',invalid_type:'字段类型异常',conflicting:'字段数值冲突'};
+  $('marketList').replaceChildren(...s.markets.map(m=>{const card=document.createElement('article');card.append(text('h2',m.gpu||m.id),text('p',`${m.region} · 主机 ${m.id} · 空闲 ${m.idle===null?`暂不可确认（${issues[m.idleIssue]||'未知原因'}）`:m.idle+' 卡'}`));return card;}));
   for(const id of ['instanceList','marketList'])if(!$(id).children.length)$(id).append(text('p','暂无数据，请连接账号并刷新。'));
 }
 function switchTab(name){tab=name;document.querySelectorAll('.tab').forEach(el=>el.hidden=el.id!==name);document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));$('heading').textContent={dashboard:'监控台',instances:'我的实例',market:'租机候补',settings:'设置'}[name];}

@@ -11,13 +11,23 @@ function instance(raw) {
 }
 function stock(raw) {
   raw = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  const counts = ['gpu_idle_num','idle_gpu_num','gpu_idle_count'].map(key => raw[key])
-    .filter(value => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
-      || (typeof value === 'string' && /^\d+$/.test(value) && Number.isSafeInteger(Number(value))))
-    .map(Number);
-  const idle = counts.length && new Set(counts).size === 1 ? counts[0] : null;
-  return {id:String(raw.machine_id || raw.machine_uuid || raw.id || ''), idle, gpu:String(raw.gpu_type_name || raw.gpu_name || ''), region:String(raw.region_name || raw.region_sign || ''),
+  const values = ['gpu_idle_num','idle_gpu_num','gpu_idle_count'].map(key => raw[key]).filter(value=>value!==null&&value!==undefined);
+  const counts=[];let idleIssue=values.length?null:'missing';
+  for(const value of values){
+    const numeric=typeof value==='number'||(typeof value==='string'&&/^-?\d+(?:\.\d+)?$/.test(value));
+    const n=numeric?Number(value):NaN;
+    const issue=!numeric?'invalid_type':!Number.isFinite(n)?'non_finite':!Number.isInteger(n)?'fractional':n<0?'negative':!Number.isSafeInteger(n)?'out_of_range':null;
+    if(issue)idleIssue ||= issue;else counts.push(n);
+  }
+  if(!idleIssue&&new Set(counts).size>1)idleIssue='conflicting';
+  const idle=idleIssue?null:counts[0];
+  return {id:String(raw.machine_id || raw.machine_uuid || raw.id || ''), idle,idleIssue, gpu:String(raw.gpu_type_name || raw.gpu_name || ''), region:String(raw.region_name || raw.region_sign || ''),
     schema:Object.keys(raw).sort().slice(0,80).map(key=>key.slice(0,80)+':'+(raw[key]===null?'null':Array.isArray(raw[key])?'array':typeof raw[key]))};
+}
+function stockDiagnostics(markets,version){
+  const unknown=markets.filter(m=>m.idle===null),reasons={};
+  for(const record of unknown){const reason=record.idleIssue||'unclassified';reasons[reason]=(reasons[reason]||0)+1;}
+  return {version,records:markets.length,known:markets.length-unknown.length,unknown:unknown.length,reasons,schemas:[...new Set(unknown.map(m=>m.schema.join(', ')))].slice(0,5)};
 }
 function canStart(item, available) {
   return ['shutdown','stopped','poweroff','power_off'].includes(item.status) && Number.isInteger(item.count) && item.count > 0 && !!item.machine && available.id === item.machine && Number.isSafeInteger(available.idle) && available.idle >= item.count;
@@ -28,4 +38,4 @@ function settings(input) {
   if (!Number.isInteger(count) || count < 1 || count > 16) throw new Error('GPU 数量需要为 1–16');
   return {seconds,count,gpu:String(input.gpu || '').trim().slice(0,100), region:String(input.region || '').trim().slice(0,80)};
 }
-module.exports = {listOf,instance,stock,canStart,settings};
+module.exports = {listOf,instance,stock,stockDiagnostics,canStart,settings};

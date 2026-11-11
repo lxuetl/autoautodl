@@ -17,5 +17,18 @@ test('诊断只包含字段名和类型，不包含字段值',()=>{
   assert.ok(s.schema.includes('token:string'));assert.equal(JSON.stringify(s.schema).includes('sensitive'),false);
 });
 test('无主机标识绝不自动开机',()=>{assert.equal(core.canStart({status:'shutdown',machine:'',count:1},{id:'',idle:9}),false);});
+test('数值字段异常分类，不凭字段类型推断有卡',()=>{
+  for(const [value,reason] of [[-1,'negative'],[0.5,'fractional'],[Number.MAX_SAFE_INTEGER+1,'out_of_range'],[Infinity,'non_finite']]){
+    assert.equal(core.stock({gpu_idle_num:value}).idleIssue,reason);
+  }
+  assert.equal(core.stock({gpu_idle_num:-1,idle_gpu_num:2}).idle,null);
+});
+test('93条中1条异常仅报告原因分类，92条正常继续保留',()=>{
+  const records=Array.from({length:92},()=>core.stock({gpu_idle_num:2}));
+  records.push(core.stock({gpu_idle_num:-1,machine_id:'private-host'}));
+  const report=core.stockDiagnostics(records,'0.2.2');
+  assert.equal(report.known,92);assert.equal(report.unknown,1);assert.deepEqual(report.reasons,{negative:1});
+  assert.equal(JSON.stringify(report).includes('private-host'),false);
+});
 test('用户输入有范围限制',()=>{assert.throws(()=>core.settings({seconds:0,count:1}));assert.throws(()=>core.settings({seconds:45,count:0}));assert.equal(core.settings({seconds:45,count:2}).count,2);});
 test('拒绝未知列表结构',()=>{assert.throws(()=>core.listOf({foo:[]}));assert.deepEqual(core.listOf({list:[]}),[]);});
