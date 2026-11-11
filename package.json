@@ -1,1 +1,46 @@
-{"name":"autodl-companion","version":"0.1.0","private":true,"description":"AutoDL 实例与 GPU 库存助手","author":"Local project","main":"src/main.js","scripts":{"start":"electron .","demo":"electron . --demo","test":"node --test src/core.test.js","dist":"electron-builder --win portable"},"devDependencies":{"electron":"45.3.0","electron-builder":"26.18.0"},"build":{"appId":"local.autodl.companion","productName":"AutoDL Companion","directories":{"output":"release"},"files":["src/**/*","package.json"],"win":{"target":"portable","signAndEditExecutable":false},"portable":{"artifactName":"AutoDL-Companion-${version}-Windows.exe"}}}
+{
+  "name": "autodl-companion",
+  "version": "0.2.0",
+  "private": true,
+  "description": "AutoDL 实例与 GPU 库存助手",
+  "author": "Local project",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "test": "node --test src/core.test.js src/rent-workspace.test.js vendor/autodl-watch/tests/*.test.mjs",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "45.3.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "local.autodl.companion",
+    "productName": "AutoDL Companion",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "vendor/autodl-watch/src/**/*",
+      "vendor/autodl-watch/public/**/*",
+      "vendor/autodl-watch/LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "AutoDL-Companion-${version}-Windows.exe"
+    },
+    "asarUnpack": [
+      "node_modules/playwright*/**/*"
+    ]
+  },
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

@@ -6,3 +6,5 @@ electron-runtime.zip
 build-cache/
 build-tools/
 *.zip
+.runtime/
+browser-profile/

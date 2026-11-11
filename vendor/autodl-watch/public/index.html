@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f4f7fb">
+  <meta name="local-token" content="__LOCAL_TOKEN__">
+  <title>GPU 候机室 · AutoDL 监测台</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script><script src="/account.js" defer></script><script src="/images.js" defer></script><script src="/ai.js" defer></script><script src="/plan.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="GPU 候机室首页"><span class="brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3"/></svg></span><span>GPU 候机室<small>AUTODL WATCH</small></span></a>
+    <div class="nav-label">工作空间</div>
+    <button class="nav-item active" data-view="dashboard"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>资源监测</button>
+    <button class="nav-item" data-view="notifications"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>消息中心 <b id="unread" class="count">0</b></button>
+    <button class="nav-item" data-view="ai"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/><path d="M20 2v4m-2-2h4"/></svg></span>AI 环境与选卡 <small>可选</small></button>
+    <button class="nav-item" data-view="settings"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.7 2.3-2 .9L4.5 6l-2 3.5L4 11.2v2L2.5 15l2 3.5 2.3-.2 2 .9.7 2.3h5l.7-2.3 2-.9 2.3.2 2-3.5-1.5-1.8v-2l1.5-1.7-2-3.5-2.3.2-2-.9-.7-2.3h-5Z"/><circle cx="12" cy="12" r="3"/></svg></span>通知设置</button>
+    <div class="sidebar-bottom"><span class="online-dot"></span>本地服务 <span id="connection">连接中</span><p>电脑与服务持续运行时监测。<br>从发现空卡到分配成功仍有竞争。</p><span class="version">v0.2.1 · 普通容器实例</span></div>
+  </aside>
+  <main>
+    <header class="topbar"><span class="breadcrumb">工作空间 <span>/</span> <b id="view-title">资源监测</b></span><div class="top-actions"><span id="clock"></span><button id="desktop-notify" class="button small">开启桌面提醒</button></div></header>
+    <div id="stale-backend" class="notice stale-backend" role="alert" hidden></div>
+    <section id="dashboard" class="view">
+      <div class="hero"><div><span class="eyebrow">YOUR NEXT GPU IS ON THE WAY</span><h1>等卡的时间，交给候机室。</h1><p>按你选择的 GPU 型号持续检查，发现资源后创建实例，或带着数据盘迁移。</p></div><span class="hero-chip"><i class="online-dot"></i>精确型号匹配</span></div>
+      <div class="metrics"><article><span>监测与执行中</span><strong id="metric-active">0</strong><small>任务持久化保存</small></article><article><span>已完成任务</span><strong id="metric-done">0</strong><small>真实 AutoDL 任务</small></article><article><span>需要你处理</span><strong id="metric-attention">0</strong><small>登录、核对或复制失败</small></article><article class="gpu-metric"><span>本次目标资源</span><strong id="metric-gpu-model">尚未选择</strong><small id="metric-gpu-detail">由你指定，不自动代选</small></article></div>
+      <div class="workspace-grid">
+        <section class="panel composer"><div class="panel-heading"><div><h2>建立监测任务</h2><p>连接 AutoDL 账号后，按你的配置持续监测。</p></div><span class="step-tag">01 / 配置</span></div>
+          <div class="mode-tabs" role="tablist" aria-label="任务模式"><button type="button" class="mode active" data-mode="create" role="tab" aria-selected="true">＋ 新建实例<small>按环境与预算抢卡</small></button><button type="button" class="mode" data-mode="clone" role="tab" aria-selected="false">⇄ 迁移克隆<small>保留系统与数据盘</small></button></div>
+          <form id="task-form">
+            <label>任务名称<input name="name" placeholder="例如：今晚的训练任务" maxlength="80"></label>
+            <div class="field-grid"><label>运行平台<input value="AutoDL 真实账号" readonly aria-label="运行平台"></label><label>发现空卡后<select name="action"><option value="execute" selected>自动创建并开机</option><option value="observe">只通知，停在提交之前</option></select></label></div>
+            <div id="live-note" class="notice">请先打开专用浏览器登录。默认找到空闲 GPU 后自动创建并开机，需要勾选下方费用授权；想先试运行可选“只通知”。不能保证抢到资源。</div>
+            <fieldset class="region-field"><legend id="region-label">监测地区 <small>可多选</small></legend><div id="regions" class="region-options"></div></fieldset>
+            <label><span id="gpu-model-title">GPU 精确型号</span><select name="gpuModel" required aria-describedby="gpu-model-hint"><option value="" disabled selected>请先点“同步 AutoDL 型号”</option><option value="__custom__">其他型号（精确填写）</option></select></label>
+            <label id="custom-gpu-field" class="hidden">其他 GPU 精确型号<input name="customGpuModel" maxlength="80" placeholder="按 AutoDL 完整名称填写，如 A100 80GB" aria-describedby="gpu-model-hint" disabled></label>
+            <div class="model-sync"><p id="gpu-model-hint" class="hint" role="status">型号从 AutoDL 创建页按地区读取。登录后点“同步 AutoDL 型号”。</p><button id="sync-gpus" type="button" class="button small">同步 AutoDL 型号</button></div>
+            <div class="field-grid"><label>GPU 数量<select name="gpuCount"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>10</option><option>12</option></select></label><label>额外扩容数据盘 <span class="unit">GB</span><input name="extraDiskGB" type="number" min="0" max="100000" value="0" required></label></div>
+            <!-- 环境 CUDA：新建时由下方官方镜像的第四级带入，克隆时随源实例，不需要单独填写。 -->
+            <input name="cuda" type="hidden" value="">
+            <p id="cuda-hint" class="hint">新建时 CUDA 随下方选择的官方镜像带入，宿主驱动需支持它；扩容数据盘可能在关机后继续计费。</p>
+            <div id="create-fields" class="image-picker">
+              <div class="image-picker-heading"><strong>AutoDL 官方基础镜像</strong><button id="sync-images" type="button" class="button small">同步官方镜像</button></div>
+              <p id="image-status" class="hint" role="status" aria-live="polite">登录后点击同步，依次选择框架、框架版本、Python 和 CUDA。</p>
+              <div class="field-grid"><label>框架名称<select id="image-framework" aria-label="镜像框架" disabled><option value="">请先同步官方镜像</option></select></label><label>框架版本<select id="image-version" aria-label="镜像框架版本" disabled><option value="">请先选择框架</option></select></label><label>Python 版本（系统）<select id="image-python" aria-label="镜像 Python 版本" disabled><option value="">请先选择框架版本</option></select></label><label>CUDA 版本<select id="image-cuda" aria-label="镜像 CUDA 版本" disabled><option value="">请先选择 Python</option></select></label></div>
+              <label>已选镜像完整路径<input name="imagePath" value="" placeholder="完成上方四级选择后自动生成" readonly aria-describedby="image-status"></label>
+              <p class="hint">选项按上一级从 AutoDL 当前基础镜像菜单读取，不自动拼接或替换版本。提交前会再次核对；克隆继承源实例环境。</p>
+            </div>
+            <div id="clone-fields" class="hidden">
+              <div id="live-source-fields"><label>选择源实例<select name="sourceId" aria-describedby="source-summary"><option value="">请先同步 AutoDL 实例</option></select></label><button id="refresh-sources" type="button" class="button small">同步实例列表</button><p id="source-summary" class="hint" role="status">选中已关机的源实例后，地区固定为源实例所在地区，GPU 型号和数量默认与源实例相同、可以更换。源实例只被读取，不会被改动。</p></div>
+              <label class="check-label"><input type="checkbox" name="copyDataDisk" checked>同时复制数据盘</label>
+              <div id="copy-disk-note" class="notice">克隆系统盘并复制数据盘，目标扩容至少等于源扩容。源实例会保留。</div>
+            </div>
+            <div class="form-divider"><span>AutoDL 官方报价</span><small>人民币 · 按量计费</small></div>
+            <section id="pricing-card" class="pricing-card" aria-label="当前配置报价">
+              <div class="price-values single"><div><span>单卡每小时</span><strong id="price-unit">—</strong></div></div>
+              <p id="price-detail" class="price-detail" hidden>配置每小时 <span id="price-hourly">—</span><span id="price-cards"></span> · 磁盘每日 <span id="price-storage">—</span></p>
+              <p id="price-status" class="hint" role="status">选好配置后读取报价；真实价格来自 AutoDL 页面。</p>
+              <p id="price-source" class="price-meta">尚未读取</p><button id="refresh-pricing" type="button" class="button small">读取当前配置报价</button>
+              <p class="hint">报价随库存与配置变化；无完整配置报价时不估算总费用。预览有效期60秒，提交时重新读取。</p>
+            </section>
+            <label>监测时长 <span class="unit">分钟</span><input name="timeoutMinutes" type="number" min="1" max="10080" value="1440" required></label>
+            <div id="balance-fields">
+              <label class="check-label"><input type="checkbox" name="balanceGuard" checked>提交前检查账户余额（可选）</label>
+              <div class="field-grid"><label>预计运行时长 <span class="unit">小时</span><input name="expectedHours" type="number" min="0.1" max="8760" step="0.1" value="1" required></label><label>保留余额 <span class="unit">元</span><input name="balanceReserve" type="number" min="0" max="1000000" step="0.01" value="0" required></label></div>
+              <label class="check-label"><input type="checkbox" name="includeVouchers">将代金券计入预算（需自行确认可抵扣本次费用）</label>
+              <p id="budget-status" class="notice" role="status">配置余额 Token 后可预检。</p><button id="check-budget" type="button" class="button small">刷新余额并预检预算</button>
+              <p class="hint">按完整配置报价 × 预计小时，加磁盘日价 × 向上取整天数，再加保留余额估算。实际提交按最新报价重查；不预留资金，也不会按此时长关机。</p>
+            </div>
+            <label>检查间隔 <span class="unit">秒</span><input name="pollSeconds" type="number" min="1" max="600" step="1" value="1" required aria-describedby="poll-hint"></label>
+            <p id="poll-hint" class="hint">1～600 秒的整数，默认1秒，从上一轮开始时计时：一轮本身（打开页面、筛选、读列表）通常要几秒到十几秒，超过间隔时下一轮立即开始，设为1秒即连续检查。错误时会退避。</p>
+            <div class="field-grid"><label>每轮扫描范围<select name="scanScope" aria-describedby="scan-hint"><option value="first-page" selected>首页优先，定期完整翻页</option><option value="full">每轮完整翻页</option></select></label><label>完整翻页间隔 <span class="unit">秒</span><input name="fullScanSeconds" type="number" min="10" max="3600" step="1" value="20" required aria-describedby="scan-hint"></label></div>
+            <p id="scan-hint" class="hint">首页优先：每轮先读各地区第一页，命中立即核验；后续页面按间隔完整翻页补查，首次检查总是完整翻页。AutoDL 不保证有卡主机都排在第一页，只出现在后页的合格主机最多晚约一个间隔才被发现。少翻页只省下第一页未命中时的翻页时间，打开页面和设置筛选通常更耗时，可在运行日志的“用时”中核对。</p>
+            <label id="consent-label" class="consent hidden"><input type="checkbox" name="paidConsent"><span>我授权此任务在匹配条件后，按提交时的 AutoDL 官方报价自动创建或克隆并开机并产生费用。预览不锁价，程序不会按预计时长自动关机。</span></label>
+            <button type="submit" id="submit-task" class="button primary wide">开始真实库存监测 <span>→</span></button>
+            <p class="form-footnote">一次任务最多提交一次。提交结果不明时会先停下核对。</p>
+          </form>
+        </section>
+        <div class="task-column">
+          <section id="autodl-connection" class="panel browser-card" aria-labelledby="autodl-title" data-session="not_open">
+            <div class="browser-header"><div class="browser-icon" aria-hidden="true">◎</div><div class="browser-copy"><div class="browser-heading"><h2 id="autodl-title">连接 AutoDL</h2><span id="browser-session-badge" class="badge neutral">未打开登录</span></div><p id="browser-status" role="status" aria-live="polite">先打开专用浏览器，在 AutoDL 官方页面完成登录。</p></div></div>
+            <div class="browser-actions"><button id="open-browser" type="button" class="button small">打开登录</button><button id="check-browser" type="button" class="button primary small" disabled>检查登录状态</button><button id="logout-browser" type="button" class="button small">退出 AutoDL</button></div>
+            <p id="browser-checked-at" class="browser-meta">尚未核验；打开浏览器不代表已登录。</p>
+            <p id="browser-busy" class="browser-busy hidden">后台正在操作页面；检查若提示忙碌，请稍后重试或先暂停真实任务。</p>
+            <ol class="browser-steps" aria-label="AutoDL 连接步骤"><li>打开专用浏览器</li><li>在 AutoDL 完成登录</li><li>回到此处检查状态</li></ol>
+            <p class="browser-footnote">登录资料保存在本机专用浏览器中，下次可继续使用，失效时需重新登录。退出会清除此资料并暂停真实任务；不会撤销其他设备会话。</p>
+          </section>
+          <section class="panel account-card" aria-labelledby="instances-title"><div class="panel-heading"><div><h2 id="instances-title">AutoDL 实例</h2><p id="instances-status" role="status">登录并同步后，可选择已关机实例进行同地区克隆。</p></div><button id="sync-instances" type="button" class="button small">同步实例</button></div><div id="account-instances" class="instance-list"><p class="hint">尚未同步实例。</p></div></section>
+          <section class="panel account-card" aria-labelledby="wallet-title"><div class="panel-heading"><div><h2 id="wallet-title">账户余额</h2><p id="wallet-status" role="status">可选的预算保护，余额来自 AutoDL 开发者接口。</p></div><button id="refresh-wallet" type="button" class="button small">刷新余额</button></div><div class="wallet-values"><div><span>账户余额</span><strong id="wallet-balance">—</strong></div><div><span>代金券</span><strong id="wallet-vouchers">—</strong></div></div><form id="wallet-form"><label>AutoDL 开发者 Token<input name="token" type="password" maxlength="2048" autocomplete="new-password" placeholder="从 AutoDL 控制台 · 设置获取"></label><label class="check-label"><input name="rememberToken" type="checkbox">在本机加密记住余额 Token</label><p id="wallet-key-status" class="hint" role="status">尚未配置</p><div class="account-actions"><button type="submit" class="button primary small">连接并查询余额</button><button id="clear-wallet" type="button" class="button small">清除 Token</button></div></form><p class="hint">请使用与专用浏览器相同账号的 Token。余额接口无法核实两个登录是否属于同一账号。勾选记住后重启可恢复；已配置时输入留空表示保留，真实 Token 不回填页面。代金券默认不计入预算。</p></section>
+          <section class="panel queue-panel" id="queue-panel"><div class="panel-heading"><div><h2>任务队列 <span id="task-count" class="count">0</span></h2><p id="queue-summary">无库存时静默等待，关键变化时通知。</p></div><div class="queue-tools"><span class="live-indicator"><i class="online-dot"></i>自动刷新</span><button id="toggle-queue" type="button" class="text-button" aria-controls="tasks" aria-expanded="true">收起</button></div></div><div id="tasks" class="tasks"></div></section>
+          <section class="panel flow-card"><span class="eyebrow">迁移流程</span><div class="flow"><span>发现同区空卡</span><i>→</i><span>克隆系统盘</span><i>→</i><span>按选择复制数据盘</span><i>→</i><span>确认运行</span></div><p>勾选数据盘时，GPU 开机和复制完成分别核验；未勾选则仅克隆系统盘。复制状态缺少明确证据时，请在目标实例核验后确认。</p></section>
+        </div>
+      </div>
+    </section>
+    <section id="notifications" class="view hidden"><div class="page-heading"><div><span class="eyebrow">ONLY WHEN IT MATTERS</span><h1>消息中心</h1><p>资源命中、完成、失败和需要操作时，在这里查看。</p></div><button id="read-notifications" class="button">全部标为已读</button></div><section class="panel" id="notification-list"></section></section>
+    <section id="settings" class="view hidden"><div class="page-heading"><div><span class="eyebrow">STAY CONNECTED</span><h1>通知设置</h1><p>站内消息始终开启。可同时发送到自己的 Webhook 和 AutoDL 微信。</p></div></div><section class="panel settings-panel"><form id="settings-form"><h2>Webhook</h2><label class="check-label"><input type="checkbox" name="webhookEnabled">启用 HTTPS Webhook</label><label>接收地址<input name="webhookUrl" type="text" placeholder="https://你的服务/notify" autocomplete="off"></label><label>Bearer Token（可选）<input name="webhookToken" type="password" autocomplete="new-password"></label><p class="hint">使用通用 JSON 格式，字段见 README。含签名或特殊消息格式的机器人需要你自己的转发服务。</p><div class="form-divider"><span>AutoDL 官方微信</span></div><label class="check-label"><input type="checkbox" name="wechatEnabled">启用 AutoDL 微信通知</label><label>开发者 Token<input name="wechatToken" type="password" autocomplete="new-password"></label><p class="hint">需先在 AutoDL 绑定微信，再在账号页面获取 Token。程序不会代你创建 Token 或绑定账号。</p><label class="check-label"><input type="checkbox" name="rememberCredentials" checked>在本机加密记住通知凭据</label><div id="notification-storage-hint" class="notice">未勾选时凭据仅在本次服务中使用。记住时由当前 Windows 用户保护；请勿分享 .runtime 目录。</div><button class="button primary" type="submit">保存通知设置</button></form></section></section>
+    <section id="ai" class="view hidden">
+      <div class="page-heading"><div><span class="eyebrow">ENVIRONMENT &amp; GPU PLANNING</span><h1>AI 环境与选卡</h1><p>读懂项目的运行条件，算出哪些 GPU 型号能用，再一键填入新建任务。规则部分不需要模型；需要时用你自己的模型 API Key（DeepSeek、百炼等）补充规则读不出的内容。</p></div><span id="ai-status" class="badge neutral">未启用</span></div>
+      <section class="panel ai-panel plan-panel" aria-labelledby="plan-title"><form id="plan-form">
+        <div class="panel-heading"><div><h2 id="plan-title">环境与选卡规划</h2><p>粘贴 README、requirements.txt、environment.yml 或报错日志。程序读出版本与显存要求，对照“同步 AutoDL 型号”得到的目录，给出可用型号、各地区空闲数和官方镜像。</p></div><span class="step-tag">AI · 规划</span></div>
+        <label>你要做什么（可选，模型据此在多个显存数字中选择）<input name="request" maxlength="1200" placeholder="例如：LoRA 微调 7B 模型；推理 Vicuna-13B"></label>
+        <label>项目资料<textarea name="projectText" rows="7" maxlength="24000" placeholder="粘贴项目的 README 片段、依赖文件或报错。克隆到其他型号前，可在源实例运行下方命令，把输出贴进来检查目标卡能否运行。"></textarea></label>
+        <label class="ai-file-label">或选择文本文件追加到上方<input id="plan-file" type="file" accept=".txt,.md,.yml,.yaml,.toml,.cfg,.ini,.py,.log,.json"></label>
+        <div class="field-grid"><label>计划卡数<select name="gpuCount"><option>1</option><option>2</option><option>4</option><option>8</option></select></label>
+          <label class="check-label plan-model"><input type="checkbox" name="useModel">让 AI 补充规则读不出的约束</label></div>
+        <label id="plan-consent" class="check-label hidden"><input type="checkbox" name="consent"><span id="plan-consent-text">我已检查本次文本，同意交给所选模型分析</span></label>
+        <div class="ai-actions"><button class="button primary" id="plan-submit" type="submit">分析并选卡</button></div>
+        <p id="plan-status" class="hint" role="status" aria-live="polite">只读取本表单文本，不连接 AutoDL、不创建任务。型号结论依赖上次同步的型号目录。</p>
+      </form></section>
+      <section class="panel ai-panel ai-results" id="plan-results" hidden aria-live="polite"></section>
+      <div class="ai-layout">
+        <section class="panel ai-panel"><form id="ai-settings-form">
+          <h2>模型设置（可选）</h2>
+          <label class="check-label"><input type="checkbox" name="enabled">启用 AI 分析</label>
+          <label>模型接口<select name="provider" id="ai-provider"></select></label>
+          <label>Base URL<input name="baseUrl" type="url" placeholder="模型服务的 HTTPS 基础地址" maxlength="2048" autocomplete="off"></label>
+          <p class="hint" id="ai-provider-hint"></p>
+          <label>模型 ID<input name="model" placeholder="填写账号已开通的模型 ID" maxlength="150" autocomplete="off"></label>
+          <label>API Key<input name="apiKey" type="password" placeholder="填写自己的 Key；留空可保留当前连接已有 Key" maxlength="2048" autocomplete="new-password" spellcheck="false"></label>
+          <p class="hint" id="ai-key-status">尚未配置 API Key。</p>
+          <label class="check-label"><input type="checkbox" name="rememberKey">记住 API Key 到本机</label>
+          <p id="ai-storage-hint" class="hint">勾选记住后由当前 Windows 用户加密保护，下次自动恢复为已配置；真实 Key 不回填页面。不勾选时仅在本次服务中使用。</p>
+          <div class="field-grid"><label>超时（秒）<input name="timeoutSeconds" type="number" min="5" max="120" value="60" required></label><label>输出 Token 上限<input name="maxTokens" type="number" min="256" max="4096" value="2048" required></label></div>
+          <p class="hint">更换接口类型或 Base URL 时需重新填写 Key。保存设置不会请求模型；分析可能产生服务商费用，输出上限不代表费用封顶。</p>
+          <div class="ai-actions"><button class="button primary" type="submit">保存 AI 设置</button><button class="button small" id="ai-clear-key" type="button">清除 Key 并停用</button></div>
+        </form></section>
+        <section class="panel ai-panel"><form id="ai-analysis-form">
+          <h2>分析项目或错误日志（文字建议）</h2>
+          <label>分析目标<select name="mode"><option value="plan">新建前：理解项目环境要求</option><option value="diagnose">运行后：诊断环境或启动问题</option></select></label>
+          <label>你的需求与硬约束<textarea name="request" rows="3" maxlength="1200" placeholder="例如：只使用我选择的 GPU 型号，请根据下面的依赖判断环境需求，指出还需要核实什么。" required></textarea></label>
+          <label>项目说明与依赖<textarea name="projectText" rows="6" maxlength="12000" placeholder="粘贴 README 相关片段、requirements.txt 或 environment.yml。不会自动读取你的仓库或数据盘。"></textarea></label>
+          <label class="ai-file-label">或选择文本文件追加到上方<input id="ai-project-file" type="file" accept=".txt,.md,.yml,.yaml,.toml,.json,.log,.sh,.py,.cfg,.ini"></label>
+          <label>脱敏后的错误日志<textarea name="errorText" rows="5" maxlength="12000" placeholder="故障诊断时必填。请移除密码、登录凭证及私有数据。"></textarea></label>
+          <p class="hint">三项文本合计最多 16000 字符。仅发送本表单文本；不会自动附加任务记录、账号凭证或数据盘文件。基础脱敏不能替代人工检查。</p>
+          <label class="check-label"><input type="checkbox" name="consent" required>我已检查本次文本，同意发送给所选模型服务商分析</label>
+          <div class="ai-actions"><button class="button primary" id="ai-analyze" type="submit" disabled>发送并分析</button><button class="button small" id="ai-cancel" type="button" disabled>取消等待</button></div>
+          <p id="ai-analysis-status" class="hint" role="status" aria-live="polite">填写并保存模型设置后可使用。</p>
+        </form></section>
+      </div>
+      <section class="panel ai-panel ai-results" id="ai-results" hidden aria-live="polite"></section>
+    </section>
+    <footer>GPU 候机室 <span>·</span> 本地工具，与 AutoDL 官方无隶属关系 <span>·</span> <span id="last-updated">等待首次连接</span></footer>
+  </main>
+  <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
+  <dialog id="task-dialog"><div class="dialog-top"><h2 id="detail-title">任务详情</h2><button id="close-dialog" class="icon-button" aria-label="关闭详情">×</button></div><div id="detail-content"></div></dialog>
+  <dialog id="task-conflict-dialog" aria-labelledby="conflict-title">
+    <div class="dialog-top"><h2 id="conflict-title">已有相同资源的任务</h2></div>
+    <p class="hint">当前填写的配置已保留。</p>
+    <div class="conflict-summary"><h3>原任务</h3><p id="conflict-old"></p><p id="conflict-error" class="error"></p></div>
+    <div class="conflict-summary"><h3>当前配置</h3><p id="conflict-current"></p></div>
+    <p id="conflict-help" class="notice" role="status"></p>
+    <div class="account-actions"><button id="conflict-close" type="button" class="button">返回修改配置</button><button id="conflict-view" type="button" class="button">查看原任务与日志</button><button id="replace-task" type="button" class="button primary" hidden>停止未提交旧任务并按当前配置重建</button></div>
+  </dialog>
+  <dialog id="logout-dialog" aria-labelledby="logout-title"><h2 id="logout-title">退出本项目的 AutoDL 登录</h2><p>将暂停真实监测任务、关闭专用浏览器并清除其中的登录资料。已创建的云端实例和数据盘会保留，仍可能计费。</p><p class="hint">只清除本项目本机登录，不撤销其他设备会话或平台 Token。恢复任务前需重新登录并核验。</p><label class="check-label"><input id="logout-clear-credentials" type="checkbox">同时清除已保存及本次运行的 AI Key、余额 Token 和通知凭据</label><div class="account-actions"><button id="logout-cancel" type="button" class="button">取消</button><button id="confirm-logout" type="button" class="button primary">退出并清理本机登录</button></div></dialog>
+</body>
+</html>

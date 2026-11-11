@@ -7,6 +7,27 @@ const demo = process.argv.includes('--demo');
 if(!app.requestSingleInstanceLock()){app.exit(0);}
 app.on('second-instance',()=>{if(win){win.show();win.focus();}});
 let win,login,tray,token='',timer,busy=false,quitting=false,generation=0,errors=0;
+let rentWorkspace=null,rentWindow=null,rentOpening=null;
+async function openRentWorkspace(){
+  if(demo&&!process.argv.includes('--workspace-smoke'))throw new Error('演示模式不会启动真实租机工作台，请正常启动应用后使用');
+  if(rentOpening)return rentOpening;
+  rentOpening=(async()=>{
+    if(rentWindow&&!rentWindow.isDestroyed()){rentWindow.show();rentWindow.focus();return;}
+    if(!rentWorkspace){
+      const {createRentWorkspace}=require('./rent-workspace');
+      const runtimeDir=demo?fs.mkdtempSync(path.join(app.getPath('temp'),'autodl-workspace-smoke-')):path.join(app.getPath('userData'),'rent-workspace');
+      rentWorkspace=await createRentWorkspace(runtimeDir);
+    }
+    rentWindow=new BrowserWindow({width:1280,height:880,minWidth:980,minHeight:700,title:'AutoDL Companion · 新建与克隆工作台',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+    const localOrigin=rentWorkspace.url;
+    rentWindow.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==localOrigin)event.preventDefault();});
+    rentWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+    rentWindow.on('closed',()=>{rentWindow=null;log('租机工作台窗口已关闭；已启动的候补任务仍在后台运行');});
+    await rentWindow.loadURL(localOrigin);
+    log('已打开新建与克隆工作台；请在工作台连接专用浏览器');
+  })();
+  try{return await rentOpening;}finally{rentOpening=null;}
+}
 let state={demo,connected:false,watching:false,auto:false,target:'',instances:[],markets:[],logs:[],pending:null,updated:null,settings:{seconds:45,count:1,gpu:'RTX 4090',region:''}};
 const file=()=>path.join(app.getPath('userData'),'profile.json');
 let availabilityKey='';
@@ -122,6 +143,15 @@ app.whenReady().then(()=>{
         const counts=await win.webContents.executeJavaScript("({cards:document.querySelectorAll('#instanceList article').length, heading:document.getElementById('heading').textContent})");
         if(counts.cards!==1)throw new Error('演示实例未渲染');
         const image=await win.webContents.capturePage();fs.writeFileSync(app.isPackaged?path.join(app.getPath('temp'),'autodl-companion-preview.png'):path.join(__dirname,'..','preview.png'),image.toPNG());
+        if(process.argv.includes('--workspace-smoke')){
+          await openRentWorkspace();
+          await new Promise(resolve=>setTimeout(resolve,1200));
+          const ready=await rentWindow.webContents.executeJavaScript("!!document.querySelector('meta[name=\"local-token\"]') && document.body.innerText.includes('AutoDL')");
+          if(!ready)throw new Error('租机工作台未渲染');
+          const shot=await rentWindow.webContents.capturePage();
+          fs.writeFileSync(path.join(app.getPath('temp'),'autodl-rent-workspace-preview.png'),shot.toPNG());
+          console.log('RENT WORKSPACE SMOKE OK');
+        }
         console.log('SMOKE OK',JSON.stringify(counts));quitting=true;app.quit();
       }catch(e){console.error('SMOKE FAILED',e);app.exit(1);}
     });
@@ -144,10 +174,18 @@ app.whenReady().then(()=>{
       else if(action==='stop')halt();
       else if(action==='clearPending'){if(state.watching)throw new Error('请先停止监控');state.pending=null;persist();log('已手动确认上次请求结果');}
       else if(action==='market')await shell.openExternal('https://www.autodl.com/market/list');
+      else if(action==='rentWorkspace')await openRentWorkspace();
       else if(action==='instances')await shell.openExternal('https://www.autodl.com/console/instance/list');
       emit();return {ok:true};
     }catch(e){log(e.message);return {error:e.message};}
   });
 });
-app.on('before-quit',()=>{quitting=true;halt();});
+let rentClosing=false;
+app.on('before-quit',event=>{
+  quitting=true;halt();
+  if(rentWorkspace){
+    event.preventDefault();
+    if(!rentClosing){rentClosing=true;rentWorkspace.close().then(()=>{rentWorkspace=null;app.quit();}).catch(e=>{rentClosing=false;log('租机任务尚未安全退出：'+e.message);});}
+  }
+});
 app.on('window-all-closed',()=>app.quit());

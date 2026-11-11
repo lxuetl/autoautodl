@@ -11,7 +11,7 @@ function render(s){current=s;$('connection').textContent=s.connected?'已连接�
 }
 function switchTab(name){tab=name;document.querySelectorAll('.tab').forEach(el=>el.hidden=el.id!==name);document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));$('heading').textContent={dashboard:'监控台',instances:'我的实例',market:'租机候补',settings:'设置'}[name];}
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-for(const [id,action] of Object.entries({login:'login',logout:'logout',refresh:'refresh',stop:'stop',marketLink:'market',officialInstances:'instances',verify:'instances'}))$(id).onclick=()=>call(action);
+for(const [id,action] of Object.entries({login:'login',logout:'logout',refresh:'refresh',stop:'stop',marketLink:'market',rentWorkspace:'rentWorkspace',officialInstances:'instances',verify:'instances'}))$(id).onclick=()=>call(action);
 $('target').onchange=()=>call('target',$('target').value);
 $('startAuto').onclick=()=>{if(confirm('确认对所选实例启用自动有卡开机？开机后会按平台规则计费。'))call('start',true);};
 $('startWatch').onclick=()=>call('start',false);
