@@ -6,7 +6,9 @@ Windows 桌面版 AutoDL 候补助手。支持已有实例自动开机，以及�
 
 ## 下载
 
-在 [Build Windows](https://github.com/lxuetl/autoautodl/actions/workflows/windows.yml) 中打开最近一次成功运行，下载 windows-portable，解压后运行 EXE。构建产物保留 7 天。便携程序未签名，Windows 可能显示来源提示。
+在 [Releases](https://github.com/lxuetl/autoautodl/releases) 下载 Windows 便携 EXE，直接运行即可，并可用同页的 SHA256SUMS.txt 校验。当前版本标为预发布测试版。便携程序未签名，Windows 可能显示来源提示。
+
+开发构建也可从 [Build Windows](https://github.com/lxuetl/autoautodl/actions/workflows/windows.yml) 下载 windows-portable，产物保留 7 天。维护者推送 v 开头的版本标签时会自动测试、构建并发布到 Releases。
 
 ## 新建与克隆
 
