@@ -55,8 +55,10 @@ export class Wallet {
     this.fetchImpl = fetchImpl; this.clock = clock; this.timeoutMs = timeoutMs;
     this.snapshot = null; this.lastError = null;
   }
+  useSharedAccount(provider, ready) { this.clearToken(); this.provider=provider; this.accountReady=ready; }
+  configured() { return this.provider ? this.accountReady() : !!this.#token; }
   publicState() {
-    return { configured: !!this.#token, rememberToken: this.store?.data.walletSettings?.rememberToken === true, status: this.#pending ? 'refreshing' : this.lastError ? 'error' : this.snapshot ? 'ready' : this.#token ? 'connected' : 'unconfigured',
+    return { sharedAccount: !!this.provider, configured: this.configured(), rememberToken: this.store?.data.walletSettings?.rememberToken === true, status: this.#pending ? 'refreshing' : this.lastError ? 'error' : this.snapshot ? 'ready' : this.configured() ? 'connected' : 'unconfigured',
       snapshot: this.snapshot ? { ...this.snapshot } : null, lastError: this.lastError,
       stale: !this.snapshot || this.clock() - this.snapshot.checkedAt > MAX_AGE };
   }
@@ -82,7 +84,7 @@ export class Wallet {
   }
   // maxAge：调用方可要求更新鲜的快照（不超过默认30秒）；进行中的查询会被复用，不重复请求。
   async refresh({ force = false, maxAge = MAX_AGE } = {}) {
-    if (!this.#token) fail('BALANCE_TOKEN_REQUIRED', '余额保护需要配置 AutoDL 开发者 Token；也可主动关闭此任务的余额保护', { status: 409 });
+    if (!this.configured()) fail('BALANCE_TOKEN_REQUIRED', '余额保护需要配置 AutoDL 开发者 Token；也可主动关闭此任务的余额保护', { status: 409 });
     if (!force && !this.lastError && this.snapshot && this.clock() - this.snapshot.checkedAt <= Math.min(maxAge, MAX_AGE)) return this.snapshot;
     if (this.#pending) return this.#pending.promise;
     const generation = this.#generation, controller = new AbortController();
@@ -91,6 +93,12 @@ export class Wallet {
     this.#pending = pending;
     pending.promise = (async () => {
       try {
+        if(this.provider){
+          const value=await this.provider();
+          if(generation!==this.#generation || controller.signal.aborted)throw Error('cancelled');
+          if(!Number.isFinite(value.balance)||!(value.vouchers===null||Number.isFinite(value.vouchers)))throw new AppError('BALANCE_SCHEMA','共享账号余额字段无法识别');
+          this.snapshot={...value,checkedAt:this.clock()};this.lastError=null;return this.snapshot;
+        }
         const response = await this.fetchImpl(BALANCE_URL, { method: 'POST', headers: { Authorization: this.#token },
           redirect: 'error', signal: controller.signal });
         if (!response.ok) throw new AppError('BALANCE_API', response.status === 401 || response.status === 403
@@ -117,9 +125,10 @@ export class Wallet {
   }
   async check(config, quote = null, { force = false, maxAge = MAX_AGE } = {}) {
     const generation = this.#generation, budget = estimateBudget(config, quote), snapshot = await this.refresh({ force, maxAge });
-    if (generation !== this.#generation || snapshot !== this.snapshot || !this.#token)
+    if (generation !== this.#generation || snapshot !== this.snapshot || !this.configured())
       fail('BALANCE_CHANGED', '余额凭证已变更，请重新检查', { status: 409 });
     if (this.clock() - snapshot.checkedAt > MAX_AGE || this.lastError) fail('BALANCE_STALE', '余额已过期或查询失败，请重新同步', { status: 409 });
+    if(config.includeVouchers && !Number.isFinite(snapshot.vouchers))fail('BALANCE_SCHEMA','代金券余额未知，无法计入预算');
     const availableMilli = Math.round(snapshot.balance * 1000) + (config.includeVouchers ? Math.round(snapshot.vouchers * 1000) : 0);
     if (!Number.isSafeInteger(availableMilli)) fail('BALANCE_SCHEMA', '可用金额超出可核实范围', { status: 409 });
     const result = { ...budget, available: availableMilli / 1000, includeVouchers: config.includeVouchers === true,
@@ -132,7 +141,7 @@ export class Wallet {
     return result;
   }
   confirm(check) {
-    if (!check || check.credentialRevision !== this.#generation || !this.#token || !this.snapshot || this.lastError
+    if (!check || check.credentialRevision !== this.#generation || !this.configured() || !this.snapshot || this.lastError
       || this.clock() - check.checkedAt > MAX_AGE || this.clock() - this.snapshot.checkedAt > MAX_AGE)
       fail('BALANCE_STALE', '提交前余额已失效或凭证已变更，未点击付费按钮', { status: 409 });
     const available = Math.round(this.snapshot.balance * 1000) + (check.includeVouchers ? Math.round(this.snapshot.vouchers * 1000) : 0);

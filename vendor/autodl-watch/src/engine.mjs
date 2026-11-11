@@ -76,7 +76,7 @@ export class Engine {
   }
   // 正常轮次从上一轮开始时计时：一轮本身超过间隔时下一轮立即开始。出错时从现在起按次数退避。
   schedule(t, { error = false, from = null } = {}) {
-    const base = t.config.pollSeconds * 1000;
+    const base = t.operation ? Math.max(15000,t.config.pollSeconds * 1000) : t.config.pollSeconds * 1000;
     const delay = Math.round((error ? Math.min(300000, base * 2 ** Math.min(t.errors, 4)) : base) * (1 + this.random() * 0.12));
     this.store.patch(t, { nextCheckAt: !error && Number.isFinite(from) ? Math.max(this.clock(), from + delay) : this.clock() + delay });
   }
@@ -191,6 +191,8 @@ export class Engine {
       };
       await checkBalance(quote);
       if (stopped(t) || this.stopping) return;
+      if(this.beforeAcquire)await this.beforeAcquire(t);
+      if(stopped(t)||this.stopping)return;
       const op = { id: randomUUID(), stage: 'intent', at: this.clock(), quote,
         baselineIds: quote.baselineIds, sourceId: t.config.sourceId };
       this.store.patch(t, { operation: op, state: 'submitting' });
@@ -206,7 +208,7 @@ export class Engine {
       if (t.operation?.stage !== 'click_started') throw new AppError('ADAPTER_MARK', '适配器未确认持久化提交边界，已停止');
       this.store.patch(t, { operation: { ...t.operation, stage: 'accepted', receipt }, state: stopped(t) ? t.state : 'verifying', unclearStreak: 0 });
       this.notePossibleDuplicates(t, receipt?.lateIds);
-      this.alert(t, 'submitted', `创建请求已提交${receipt.instanceId ? `，目标实例 ${receipt.instanceId}` : ''}；正在验证 GPU 运行${t.config.mode === 'clone' && t.config.copyDataDisk !== false ? '及数据盘复制。请勿在复制完成前写入目标数据盘' : t.config.mode === 'clone' ? '；本次未复制数据盘' : ''}`);
+      this.store.log(t, 'info', `创建请求已提交${receipt.instanceId ? `，目标实例 ${receipt.instanceId}` : ''}；正在验证 GPU 运行${t.config.mode === 'clone' && t.config.copyDataDisk !== false ? '及数据盘复制。请勿在复制完成前写入目标数据盘' : t.config.mode === 'clone' ? '；本次未复制数据盘' : ''}`);
       this.store.log(t, 'info', `提交已返回（本轮开始到点击 ${((clickedAt - roundStart) / 1000).toFixed(1)} 秒），正在核对目标实例与数据盘进度`);
       this.schedule(t);
     } catch (error) {

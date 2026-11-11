@@ -252,3 +252,14 @@ test('保留的人工验证完成后恢复独立核验，读不到页面时不�
   assert.equal((await f.a.checkLogin()).session.state, 'ready');
   assert.deepEqual(f.events.filter(event => event[0] === 'goto'), [['goto', LIST]]);
 });
+test('桌面静默检查复用现有控制台，不开新标签、不导航、不抢焦点',async()=>{
+  const f=fixture();f.a.desktopQuiet=true;f.a.page=f.tab;
+  await f.a.checkLogin({interactive:false});await f.a.checkLogin({interactive:false});
+  assert.equal(f.a.sessionStatus().state,'ready');assert.equal(f.events.length,0);
+});
+test('桌面后台发现登录或人工验证时只更新状态，不弹出浏览器',async()=>{
+  for(const signals of [{loginForm:true},{humanRequired:true}]){
+    const f=fixture({signals});f.a.desktopQuiet=true;f.a.page=f.tab;
+    await f.a.checkLogin({interactive:false});assert.equal(f.events.some(e=>e[0]==='front'||e[0]==='new-page'),false);
+  }
+});

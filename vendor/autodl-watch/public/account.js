@@ -81,13 +81,13 @@ function renderBudget() {
   if(!f.elements.balanceGuard.checked){node.textContent='此任务未启用余额保护，按提交时的官方报价执行。';return;}
   if(!Number.isFinite(hours)||hours<=0||!Number.isFinite(reserve)||reserve<0){node.textContent='请填写有效的预计运行时长和保留余额。';return;}
   if(!quote){
-    node.textContent=!wallet.configured?'自动执行任务已启用余额保护，请先连接余额 Token，或主动关闭余额保护。暂无完整报价时，连接后仍可先开始监测。':'暂无完整配置报价，暂不能预检所需预算。仍可先启用监测；找到资源后按完整官方报价检查余额，余额不足时不会提交。';
+    node.textContent=!wallet.configured?'自动执行任务已启用余额保护，请先登录账号。暂无完整报价时，仍可先开始监测。':'暂无完整配置报价，暂不能预检所需预算。仍可先启用监测；找到资源后按完整官方报价检查余额，余额不足时不会提交。';
     return;
   }
   const required=Math.ceil((quote.hourly*hours+quote.storageDaily*Math.max(1,Math.ceil(hours/24))+reserve)*1000-1e-8)/1000;
   const available=s?s.balance+(f.elements.includeVouchers.checked?s.vouchers:0):null;
-  if(!wallet.configured){node.textContent='按当前报价估算需 '+money(required)+'。请连接开发者 Token，或主动关闭余额保护。';return;}
-  if(!s||wallet.stale||wallet.lastError){node.textContent='按当前报价估算需 '+money(required)+'。余额未知、已过期或查询失败，请刷新。';return;}
+  if(!wallet.configured){node.textContent='按当前报价估算需 '+money(required)+'。请先连接账号。';return;}
+  if(!s||wallet.stale||wallet.lastError){node.textContent='按当前报价估算需 '+money(required)+'。提交前将自动更新余额并核对预算。';return;}
   node.classList.toggle('error',available<required);
   node.textContent='按当前报价估算需 '+money(required)+'，可用 '+money(available)+'（'+(f.elements.includeVouchers.checked?'含':'不含')+'代金券）：'+(available>=required?'当前估算充足':'余额不足')+'。提交前重查，不预留资金，也不自动关机。';
 }
@@ -108,6 +108,8 @@ function renderAccount() {
   $('#wallet-balance').textContent=money(s?.balance);$('#wallet-vouchers').textContent=money(s?.vouchers);
   $('#wallet-status').textContent=wallet.lastError?'余额查询失败：'+wallet.lastError:s?'最近查询 '+time(s.checkedAt,true)+(wallet.stale?' · 已过期，请刷新':' · 提交前会再次查询'):wallet.configured?'Token 已连接，请查询余额。':'余额 Token 尚未连接。';
   const wf=$('#wallet-form'),storage=appState.credentialStorage;
+  wf.hidden=!!wallet.sharedAccount;wf.nextElementSibling.hidden=!!wallet.sharedAccount;
+  if(wallet.sharedAccount)$('#wallet-status').textContent=wallet.lastError?'共享余额暂时不可用：'+wallet.lastError:s?'与主程序共用账号余额 · '+time(s.checkedAt,true)+' · 提交前自动核对':'登录后自动同步主程序账号余额，无需另填 Token';
   if(appState.wallet&&!walletSettingsLoaded){wf.elements.rememberToken.checked=!!wallet.rememberToken;walletSettingsLoaded=true;}
   wf.elements.token.required=!wallet.configured;
   wf.elements.token.placeholder=wallet.configured?'已配置，留空保留；填写可替换':'从 AutoDL 控制台 · 设置获取';

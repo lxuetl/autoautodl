@@ -1,6 +1,6 @@
 {
   "name": "autodl-companion",
-  "version": "0.2.2",
+  "version": "0.6.5-test.1",
   "private": true,
   "description": "AutoDL 实例与 GPU 库存助手",
   "author": "Local project",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "demo": "electron . --demo",
-    "test": "node --test src/core.test.js src/rent-workspace.test.js vendor/autodl-watch/tests/*.test.mjs",
+    "test": "node --test src/core.test.js src/stock-client.test.js src/main.test.js src/session.test.js src/rent-workspace.test.js vendor/autodl-watch/tests/*.test.mjs",
     "dist": "electron-builder --win portable"
   },
   "devDependencies": {
@@ -34,7 +34,8 @@
       "signAndEditExecutable": false
     },
     "portable": {
-      "artifactName": "AutoDL-Companion-${version}-Windows.exe"
+      "artifactName": "AutoDL-Companion-${version}-Windows.exe",
+      "unpackDirName": true
     },
     "asarUnpack": [
       "node_modules/playwright*/**/*"

@@ -129,7 +129,7 @@ export function createApplication({ runtimeDir = process.env.AUTODL_RUNTIME_DIR 
   let pricePreview = null;
   let instanceSync = { instances: [], checkedAt: null, error: null };
   function requireSession() {
-    const session = adapters.autodl.sessionStatus?.();
+    const session = (adapters.autodl.accountSession?.() || adapters.autodl.sessionStatus?.());
     if (session?.state !== 'ready' || !session.browserOpen)
       fail('LOGIN_CHECK_REQUIRED', '请先在“连接 AutoDL”中打开专用浏览器、完成登录并检查状态，显示“会话可用”后再操作', { status: 409 });
   }
@@ -195,8 +195,8 @@ export function createApplication({ runtimeDir = process.env.AUTODL_RUNTIME_DIR 
         if(req.headers['x-local-token'] !== token) fail('TOKEN','本地访问令牌无效，请重新加载页面',{status:403});
         if(req.method === 'GET' && url.pathname === '/api/state') return json(res,200,{...store.publicState(),
           browser:{status:adapters.autodl.lastStatus || '会话不可用',busy:engine.busy,
-            session:adapters.autodl.sessionStatus?.() || {state:'unavailable',label:'会话不可用',message:'请打开专用浏览器并核验登录',checkedAt:null,browserOpen:false}},
-          autodlInstances: adapters.autodl.sessionStatus?.()?.state === 'ready' ? instanceSync : {instances:[],checkedAt:null,error:null},
+            session:(adapters.autodl.accountSession?.() || adapters.autodl.sessionStatus?.()) || {state:'unavailable',label:'会话不可用',message:'请打开专用浏览器并核验登录',checkedAt:null,browserOpen:false}},
+          autodlInstances: (adapters.autodl.accountSession?.() || adapters.autodl.sessionStatus?.())?.state === 'ready' ? instanceSync : {instances:[],checkedAt:null,error:null},
           wallet:wallet.publicState(),credentialStorage:store.secretStorage.publicState(),regions:REGIONS,gpuCatalog:normalizeGpuCatalog(store.data.gpuCatalog),ai:ai.publicState(),aiProviders:AI_PROVIDERS,server:serverState(),now:Date.now()});
         if(req.method !== 'POST') fail('METHOD','不支持的请求方法',{status:405});
         if(!(req.headers['content-type'] || '').startsWith('application/json')) fail('CONTENT_TYPE','控制请求需使用 JSON',{status:415});
@@ -346,7 +346,8 @@ export function createApplication({ runtimeDir = process.env.AUTODL_RUNTIME_DIR 
           return json(res,200,{ok:true,message:'已保存。外部渠道仅在任务发现资源、完成、失败或需处理时发送通知'});
         }
         if(url.pathname === '/api/notifications/read') {
-          store.data.notifications.forEach(n=>n.read=true);store.save();return json(res,200,{ok:true});
+          if(data.id!==undefined&&(typeof data.id!=='string'||!store.data.notifications.some(n=>n.id===data.id)))fail('NOT_FOUND','消息不存在',{status:404});
+          store.data.notifications.forEach(n=>{if(data.id===undefined||n.id===data.id)n.read=true;});store.save();return json(res,200,{ok:true});
         }
         if(['/api/browser/open','/api/browser/check'].includes(url.pathname)) {
           if(engine.busy || engine.stopping) fail('BUSY','正在执行页面操作，请稍后重试；如持续忙碌，请先暂停真实任务，不会打断正在进行的提交',{status:409});

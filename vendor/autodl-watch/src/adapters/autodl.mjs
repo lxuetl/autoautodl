@@ -206,6 +206,11 @@ export class AutoDLBrowserAdapter {
     this.setSession('unchecked');
     return page;
   }
+  async setWindowState(windowState) {
+    if(!this.desktopQuiet||!this.context||!this.page||this.page.isClosed())return;
+    let client;
+    try{client=await this.context.newCDPSession(this.page);const {windowId}=await client.send('Browser.getWindowForTarget');await client.send('Browser.setWindowBounds',{windowId,bounds:{windowState}});}catch{}finally{await client?.detach().catch(()=>{});}
+  }
   async login() {
     const page = await this.browser();
     const target = this.sessionPage && !this.sessionPage.isClosed() ? this.sessionPage : page;
@@ -218,6 +223,7 @@ export class AutoDLBrowserAdapter {
         if (target === page) { this.prepared = null; this.probed = null; }
         this.setSession('unchecked');
       }
+      await this.setWindowState('normal');
       await target.bringToFront();
       return { message: this.session.message, session: this.sessionStatus() };
     } catch (error) {
@@ -228,7 +234,7 @@ export class AutoDLBrowserAdapter {
       throw new AppError('BROWSER_NAVIGATION', '无法打开 AutoDL 页面。请检查网络后重试，不会创建任何实例');
     }
   }
-  async checkLogin() {
+  async checkLogin({interactive = !this.desktopQuiet} = {}) {
     if (!this.context || !this.page || this.page.isClosed()) {
       if (this.session.state !== 'not_open') this.setSession('closed');
       return { message: this.session.message, session: this.sessionStatus() };
@@ -253,7 +259,9 @@ export class AutoDLBrowserAdapter {
         { previouslyReady: this.previouslyReady }) : null;
       if (['login_required','expired','human_required'].includes(interactionState)) {
         this.setSession(interactionState, { checked: true });
-        await interactionPage.bringToFront();
+        if(interactive)await interactionPage.bringToFront();
+      } else if(!interactive && interactionState==='ready') {
+        this.setSession('ready',{checked:true});
       } else {
         // 没有未完成的人工交互时，再使用独立标签页读取实例列表正向证据。
         if (!reusable) {
@@ -267,7 +275,7 @@ export class AutoDLBrowserAdapter {
         const state = classifySessionSnapshot(snapshot, { previouslyReady: this.previouslyReady });
         const httpFailed = response && response.status() >= 400;
         this.setSession(httpFailed && !['login_required','expired','human_required'].includes(state) ? 'error' : state, { checked: true });
-        if (['login_required','expired','human_required'].includes(state)) await tab.bringToFront();
+        if (interactive && ['login_required','expired','human_required'].includes(state)) await tab.bringToFront();
       }
     } catch (error) {
       const open = this.context === context && this.page && !this.page.isClosed();
@@ -799,7 +807,7 @@ export class AutoDLBrowserAdapter {
   async startBaseline(model) {
     const main = this.page, tab = await this.context.newPage(), adapter = this;
     tab.setDefaultTimeout(12000); tab.setDefaultNavigationTimeout(30000);
-    await main.bringToFront().catch(() => {});
+    if(!this.desktopQuiet)await main.bringToFront().catch(() => {});
     const view = Object.create(this, {
       page: { value: tab, writable: true },
       browser: { value: async () => { if (tab.isClosed()) fail('BASELINE', '读取实例基线的标签页已关闭'); return tab; } },

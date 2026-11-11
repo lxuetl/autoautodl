@@ -477,3 +477,11 @@ test('控制台响应带 Cross-Origin-Opener-Policy；接管失效运行锁时�
   try{assert.throws(()=>createApplication({runtimeDir:dir,startEngine:false}),/另一个进程接管/);}finally{fs.readFileSync=original;}
   assert.equal(original(lockPath,'utf8'),'999999');
 });
+
+test('消息支持单条已读且不改变其它消息，未知ID拒绝',async t=>{
+ const f=await localApp(t);f.app.store.data.notifications=[{id:'one',read:false},{id:'two',read:false}];
+ assert.equal((await f.request('/api/notifications/read',{id:'one'})).status,200);
+ assert.equal(f.app.store.data.notifications[0].read,true);assert.equal(f.app.store.data.notifications[1].read,false);
+ assert.equal((await f.request('/api/notifications/read',{id:'missing'})).status,404);
+ await f.request('/api/notifications/read',{});assert.equal(f.app.store.data.notifications[1].read,true);
+});

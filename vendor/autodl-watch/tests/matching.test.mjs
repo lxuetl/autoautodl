@@ -126,3 +126,12 @@ test('Webhook 地址换到另一个网站时不沿用原 Token；同一网站换
   assert.equal(normalizeNotifications({webhookEnabled:true,webhookUrl:'https://a.example.test/other',webhookToken:'***'},stored).webhookToken,'synthetic-token-a');
   assert.equal(normalizeNotifications({webhookEnabled:true,webhookUrl:'https://b.example.test/notify',webhookToken:''},stored).webhookToken,'');
 });
+
+test('官方GPU报价不受旧小时上限限制，显式磁盘每日上限仍生效',()=>{
+  const c=config({pricePolicy:'official',storageDailyLimit:2,maxGpuHourly:0.01,maxTotalHourly:0.01});
+  assert.equal(c.maxGpuHourly,null);assert.equal(c.maxTotalHourly,null);assert.equal(c.maxStorageDaily,2);
+  assert.ok(!candidateReasons(host({price:9}),c).includes('价格不符'));
+  const reasons=verifyQuote({host:host(),hourly:99,storageDaily:3,extraDiskGB:0},c);
+  assert.ok(reasons.includes('磁盘日费未知、无效或超限'));
+  assert.ok(!reasons.includes('结算配置总价未知、无效或超限'));
+});

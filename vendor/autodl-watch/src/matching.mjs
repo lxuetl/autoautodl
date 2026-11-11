@@ -55,7 +55,7 @@ export function verifyQuote(quote, config, source) {
   const reasons = candidateReasons(quote.host, config, source);
   if (quote.gpuCount !== config.gpuCount) reasons.push('结算 GPU 数量不符');
   if (!(Number.isFinite(quote.hourly) && quote.hourly > 0 && (officialPricing(config) || quote.hourly <= config.maxTotalHourly))) reasons.push('结算配置总价未知、无效或超限');
-  if (!(Number.isFinite(quote.storageDaily) && quote.storageDaily >= 0 && (officialPricing(config) || quote.storageDaily <= config.maxStorageDaily))) reasons.push('磁盘日费未知、无效或超限');
+  if (!(Number.isFinite(quote.storageDaily) && quote.storageDaily >= 0 && ((officialPricing(config) && config.maxStorageDaily == null) || quote.storageDaily <= config.maxStorageDaily))) reasons.push('磁盘日费未知、无效或超限');
   if (!Number.isFinite(quote.extraDiskGB) || quote.extraDiskGB < requiredDiskGB(config, source)) reasons.push('目标扩容小于源数据盘或未知');
   if (quote.imageVerified !== true) reasons.push('镜像/源环境未确认');
   if (config.mode === 'clone' && quote.copyDataDisk !== wantsDataDisk(config)) reasons.push(wantsDataDisk(config) ? '未确认复制数据盘' : '数据盘复制选项与任务不一致');

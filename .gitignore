@@ -8,3 +8,5 @@ build-tools/
 *.zip
 .runtime/
 browser-profile/
+
+/compare-reference-local.cjs

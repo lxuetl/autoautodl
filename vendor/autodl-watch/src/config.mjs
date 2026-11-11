@@ -58,7 +58,7 @@ export function normalizeConfig(input = {}) {
   if(!['official','limits'].includes(pricePolicy))fail('CONFIG','价格策略无效');
   const maxGpuHourly = pricePolicy === 'official' ? null : num(input.maxGpuHourly, undefined, 0.01, 1000, '单卡每小时价格上限');
   const maxTotalHourly = pricePolicy === 'official' ? null : num(input.maxTotalHourly, undefined, 0.01, 10000, '配置每小时总价上限');
-  const maxStorageDaily = pricePolicy === 'official' ? null : num(input.maxStorageDaily, undefined, 0, 10000, '磁盘每日费用上限');
+  const maxStorageDaily = pricePolicy === 'official' ? (input.storageDailyLimit == null ? null : num(input.storageDailyLimit, undefined, 0, 10000, '磁盘每日费用上限')) : num(input.maxStorageDaily, undefined, 0, 10000, '磁盘每日费用上限');
   // 未指定时保持旧行为（每轮完整翻页）；控制台新表单默认提交首页优先。
   const scanScope = input.scanScope ?? 'full';
   if (!SCAN_SCOPES.includes(scanScope)) fail('CONFIG', '扫描方式无效');

@@ -117,7 +117,7 @@ function renderGpuCatalogStatus(){
   const text=gpuSyncing?(gpuSyncAuto?'登录已核验，正在自动刷新各地区的 GPU 型号和空闲数，约需十几秒；只读取页面，不会提交订单。':'正在从 AutoDL 创建页逐个地区读取 GPU 型号，约需十几秒；只读取页面，不会提交订单。')
     :gpuSyncError?'同步失败：'+gpuSyncError
     :!catalog?(ready?'型号从 AutoDL 创建页按地区读取。点“同步 AutoDL 型号”后，这里只列出所选地区有的型号。':'登录 AutoDL 并检查登录状态后，点“同步 AutoDL 型号”读取各地区的官方型号。')
-    :'同步于 '+time(catalog.checkedAt,true)+'（'+sinceText(catalog.checkedAt)+'），括号内是当时的空闲/总数，不是实时库存；每次登录核验后自动刷新。'+(issues.length?issues.join('、')+'，可重新同步。':'')
+    :'同步于 '+time(catalog.checkedAt,true)+'（'+sinceText(catalog.checkedAt)+'），括号内是当时的空闲/总数，不是实时库存；需要更新时点击“同步 AutoDL 型号”。'+(issues.length?issues.join('、')+'，可重新同步。':'')
       +(unlisted?(clone?'源实例型号不在该地区的同步列表中，克隆任务可能无法在页面上选中此型号，可重新同步核对。':'所选型号不在所选地区的同步列表中，请核对。'):'')
       +(clone?'':(picked.length>1?'多选地区时，没有该型号的地区会自动跳过。':'')+'显存或版本变体不在列表中时选“其他型号”。');
   const hint=$('#gpu-model-hint');
@@ -135,6 +135,8 @@ async function syncGpuCatalog({auto=false}={}){
 }
 // 每次登录核验通过后自动刷新一次型号目录（括号内的空闲/总数），不必手动点同步。
 window.addEventListener('appstatechange',()=>{
+  // 桌面版切换页面只读取缓存；用户主动同步才访问官方页面。
+  if(appState.browser?.session?.sharedAccount)return;
   const since=appState.browser?.session?.readySince,catalog=appState.gpuCatalog;
   if(!window.accountReady?.()||!since||gpuSyncing||gpuAutoFor===since||(catalog&&catalog.checkedAt>=since))return;
   gpuAutoFor=since;void syncGpuCatalog({auto:true});
@@ -165,11 +167,16 @@ function renderBrowser(){
   const ready=session.state==='ready'&&session.browserOpen, checking=session.state==='checking';
   const busy=!!browserAction||checking, card=$('#autodl-connection'), badge=$('#browser-session-badge');
   card.dataset.session=session.state;
+  card.classList.toggle('shared-account',!!session.sharedAccount);
+  $('#autodl-title').textContent=session.sharedAccount?'共享 AutoDL 账号':'连接 AutoDL';
+  if(session.sharedAccount){card.querySelector('.browser-steps').hidden=true;card.querySelector('.browser-footnote').textContent='监控台与新建实例共用一次登录。验证码或登录失效时，才需要重新处理。';}
   badge.textContent=session.label;badge.className='badge'+(ready?'': ['expired','human_required','network_blocked','error','unknown','login_required'].includes(session.state)?' warning':' neutral');
   if($('#browser-status').textContent!==session.message)$('#browser-status').textContent=session.message;
   $('#browser-checked-at').textContent=session.checkedAt?'最近核验：'+time(session.checkedAt,true)+' · 仅代表当时状态，任务执行时仍会检查。':'尚未核验；打开浏览器不代表已登录。';
   $('#open-browser').disabled=busy;
   $('#open-browser').textContent=browserAction==='open'?'正在打开…':ready?'打开专用浏览器':['expired','login_required'].includes(session.state)?'重新登录':session.state==='human_required'?'处理人工验证':session.state==='network_blocked'?'重试打开登录':'打开登录';
+  $('#open-browser').hidden=ready;
+  $('#check-browser').hidden=ready;
   $('#check-browser').disabled=busy||!session.browserOpen;
   $('#check-browser').textContent=browserAction==='check'||checking?'正在检查…':'检查登录状态';
   $('#logout-browser').disabled=busy||!!appState.browser?.busy;
@@ -225,10 +232,25 @@ function renderQueueToggle(){
   $('#queue-summary').textContent=queueCollapsed?'已收起：进行中 '+active+' 个，需要处理 '+attention+' 个，其余 '+(tasks.length-active-attention)+' 个。':'无库存时静默等待，关键变化时通知。';
 }
 $('#toggle-queue').addEventListener('click',()=>{queueCollapsed=!queueCollapsed;try{localStorage.setItem('queueCollapsed',queueCollapsed?'1':'0');}catch{}renderQueueToggle();});
-function delivery(n){const values=Object.entries(n.deliveries||{});return values.length?values.map(([key,val])=>`${key==='wechat'?'微信':'Webhook'}：${val.ok?'已发送':`发送失败（${val.error||'等待重试'}）`}`).join(' · '):'已记录本地消息';}
+function delivery(n){return ['wechat','webhook'].map(key=>{
+ const value=n.deliveries?.[key],name=key==='wechat'?'微信':'Webhook';
+ if(!value)return name+'：'+(appState.settings?.[key+'Enabled']?'等待发送':'未启用');
+ if(value.ok)return name+'：已发送 · '+time(value.at,true);
+ if(value.pending)return name+'：正在发送';
+ return name+'：发送失败 · 已尝试 '+(value.attempts||1)+' 次 · '+(value.error||'未收到成功回执')+((value.attempts||1)>=5?' · 自动重试已停止':value.nextAttemptAt?' · 下次重试 '+time(value.nextAttemptAt,true):'');
+ }).join('\n');}
+function notificationCards(){
+ const all=appState.notifications||[],query=$('#message-search').value.trim().toLowerCase(),kind=$('#message-kind').value,status=$('#message-status').value;
+ const failed=n=>Object.values(n.deliveries||{}).some(d=>!d.ok&&!d.pending),sent=n=>Object.values(n.deliveries||{}).some(d=>d.ok);
+ const rows=all.filter(n=>(!query||[n.name,n.message,n.taskId].join(' ').toLowerCase().includes(query))&&(kind==='all'||(kind==='attention'?!['completed','found'].includes(n.event):n.event===kind))&&(status==='all'||status==='unread'&&!n.read||status==='failed'&&failed(n)||status==='sent'&&sent(n)));
+ $('#message-summary').innerHTML=[['最近消息',all.length],['未读',all.filter(n=>!n.read).length],['任务成功',all.filter(n=>n.event==='completed').length],['发送失败',all.filter(failed).length]].map(([label,count])=>'<article><small>'+label+'</small><strong>'+count+'</strong></article>').join('');
+ $('#message-count').textContent='显示 '+rows.length+' / '+all.length+' 条 · 最近 100 条消息 · 已发送表示渠道接口已接受，最终送达以接收端为准';
+ $('#read-notifications').disabled=!all.some(n=>!n.read);
+ return rows.length?rows.map(n=>`<article class="notification-item ${n.read?'is-read':'is-unread'}"><div class="message-top"><span class="message-event ${n.event==='completed'?'success':n.event==='found'?'found':'attention'}">${n.event==='completed'?'任务成功':n.event==='found'?'发现资源':'需要关注'}</span><time>${time(n.at,true)}</time>${!n.read?'<span class="unread-tag">未读</span>':''}</div><h3>${esc(n.name)}</h3><p>${esc(n.message)}</p><details><summary>查看渠道发送详情</summary><pre class="delivery-detail">${esc(delivery(n))}</pre><small>事件：${esc(n.event)} · 任务：${esc(n.taskId)}</small></details><div class="message-actions">${!n.read?'<button type="button" class="button small" data-read-message="'+esc(n.id)+'">标记已读</button>':''}<button type="button" class="button small" data-copy-message="${esc(n.id)}">复制消息</button></div></article>`).join(''):'<div class="empty"><h3>'+(!all.length?'暂无消息':'没有符合条件的消息')+'</h3><p>'+(!all.length?'任务确认成功或需要处理时，会在这里留下记录。':'调整搜索词或筛选条件。')+'</p></div>';
+}
 function renderNotifications(){
   $('#unread').textContent=appState.notifications.filter(n=>!n.read).length;
-  replaceKeeping($('#notification-list'),appState.notifications.length?appState.notifications.map(n=>`<article class="notification-item"><h3>${!n.read?'<i class="online-dot"></i>':''}${esc(n.name)}<time>${time(n.at,true)}</time></h3><p>${esc(n.message)}</p><small>${esc(delivery(n))}</small></article>`).join(''):`<div class="empty"><div class="empty-icon">♧</div><h3>暂时没有新消息</h3><p>有空卡、执行完成或需要你处理时，会在这里留下消息。</p></div>`);
+  replaceKeeping($('#notification-list'),notificationCards());
   if(seenNotifications){for(const n of appState.notifications){if(!seenNotifications.has(n.id)&&'Notification'in window&&Notification.permission==='granted'){new Notification('GPU 候机室 · '+n.name,{body:n.message,tag:n.id,icon:'/favicon.svg'});}seenNotifications.add(n.id);}}
   else seenNotifications=new Set(appState.notifications.map(n=>n.id));
 }
@@ -365,3 +387,15 @@ $('#read-notifications').addEventListener('click',async()=>{try{await api('/api/
 $('#desktop-notify').addEventListener('click',async()=>{if(!('Notification'in window)){toast('当前浏览器不支持桌面通知，请配置微信或 Webhook',true);return;}const result=await Notification.requestPermission();toast(result==='granted'?'桌面提醒已开启，请保持本页面打开':'未启用桌面通知，站内消息仍会保留');});
 function tickClock(){$('#clock').textContent=new Date().toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});}
 regions();updateForm();renderBrowser();tickClock();void refresh();setInterval(()=>void refresh(),2000);setInterval(tickClock,30000);
+
+for(const kind of ['wechat','webhook'])$('#guide-'+kind).addEventListener('click',()=>{
+ const help=$('#'+kind+'-help');help.open=true;help.scrollIntoView({behavior:'smooth',block:'start'});$('#'+kind+'-heading').focus({preventScroll:true});
+});
+$('#guide-deliveries').addEventListener('click',()=>document.querySelector('[data-view="notifications"]').click());
+
+for(const id of ['message-search','message-kind','message-status'])$('#'+id).addEventListener(id==='message-search'?'input':'change',renderNotifications);
+$('#notification-list').addEventListener('click',async event=>{
+ const read=event.target.closest('[data-read-message]'),copy=event.target.closest('[data-copy-message]');
+ try{if(read){await api('/api/notifications/read',{id:read.dataset.readMessage});await refresh();}
+ if(copy){const n=appState.notifications.find(n=>n.id===copy.dataset.copyMessage);if(n){await navigator.clipboard.writeText(n.name+'\n'+n.message+'\n'+delivery(n));toast('消息已复制');}}}catch(error){toast(error.message,true);}
+});
