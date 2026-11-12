@@ -1,6 +1,6 @@
 {
   "name": "autodl-companion",
-  "version": "0.6.5-test.1",
+  "version": "0.6.6-test.1",
   "private": true,
   "description": "AutoDL 实例与 GPU 库存助手",
   "author": "Local project",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "local.autodl.companion",
-    "productName": "AutoDL Companion",
+    "productName": "autoautodl",
     "directories": {
       "output": "release"
     },
@@ -31,10 +31,11 @@
     ],
     "win": {
       "target": "portable",
-      "signAndEditExecutable": false
+      "signExecutable": false,
+      "icon": "src/assets/autoautodl.ico"
     },
     "portable": {
-      "artifactName": "AutoDL-Companion-${version}-Windows.exe",
+      "artifactName": "autoautodl-${version}-Windows.exe",
       "unpackDirName": true
     },
     "asarUnpack": [

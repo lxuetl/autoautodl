@@ -1,6 +1,6 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');const path=require('node:path');
 function mainContext(){
- const app={requestSingleInstanceLock:()=>true,on:()=>{},whenReady:()=>({then:()=>{}}),getPath:()=>'/fixture',getVersion:()=> 'test'};
+ const app={setPath:()=>{},requestSingleInstanceLock:()=>true,on:()=>{},whenReady:()=>({then:()=>{}}),getPath:()=>'/fixture',getVersion:()=> 'test'};
  const writes=[];const fakeFS={writeFileSync:(...args)=>writes.push(args),renameSync:()=>{}};
  const context=vm.createContext({require:name=>name==='electron'?{app,Notification:{isSupported:()=>false}}:name==='node:fs'?fakeFS:name==='./core'?require('./core'):require(name),__dirname,process:{argv:[]},Buffer,URL,AbortSignal,setTimeout,clearTimeout,clearInterval,console});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'main.js'),'utf8'),context);

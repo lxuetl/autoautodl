@@ -20,3 +20,6 @@ nav{scrollbar-width:thin;scrollbar-color:#365268 transparent}::-webkit-scrollbar
 .control-panel .setup-note{margin-bottom:10px}.control-panel label{margin:8px 0 5px}.control-panel .mode-choices button{padding:8px 6px}.control-panel .actions{margin-top:10px}.dashboard-side .task-panel{padding:14px 18px}.dashboard-side .task-panel h2{margin:0 0 8px}.dashboard-side .task-panel p{margin:3px 0}.sentinel-body{padding:18px 4px}.monitor-hero{min-height:330px}.control-panel{padding:17px}.runtime-panel .resource-strip{display:grid}
 
 .instance-card .chip-icon{background:#173d40;color:#78ead6;border:1px solid #376563}.instance-card .actions button:first-child{background:#20473f;color:#a8f8df;border-color:#3b7e6b}.instance-card .actions button:first-child:hover{background:#2b5c50;color:#ddfff1}.instance-card .instance-resources{border-color:#35495f}.instance-card .actions button:focus-visible{outline-color:#72d8c1}
+
+/* Shared desktop identity. */
+.brand{gap:9px;padding:0 4px;font-size:19px;letter-spacing:-.6px;color:#e2f5fa}.brand img{flex:none;object-fit:contain}.brand span{white-space:nowrap}.brand small{display:block;margin-top:5px;font-size:8px;letter-spacing:1.6px;color:#8ca9bd}

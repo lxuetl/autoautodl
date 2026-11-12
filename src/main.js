@@ -5,6 +5,9 @@ const path = require('node:path');
 const core = require('./core');
 const {StockClient}=require('./stock-client');
 const stockClient=new StockClient((endpoint,body)=>request(endpoint,body));
+// Preserve existing profiles and browser sessions after the display-name change.
+app.setPath('userData',path.join(app.getPath('appData'),'autodl-companion'));
+const appIcon=path.join(__dirname,'assets','autoautodl.png');
 const demo = process.argv.includes('--demo');
 if(demo&&process.argv.includes('--smoke'))app.setPath('userData',fs.mkdtempSync(path.join(app.getPath('temp'),'autodl-desktop-smoke-')));
 if(!app.requestSingleInstanceLock()){app.exit(0);}
@@ -66,7 +69,7 @@ function persist(){
 function publicState(){const snapshot=rentWorkspace?.service?.wallet?.snapshot;if(state.connected&&snapshot)state.balance={cash:snapshot.balance,voucher:snapshot.vouchers,blocked:snapshot.blocked,at:snapshot.checkedAt};return {...state,rentalTasks:(rentWorkspace?.service?.store.tasks()||[]).map(t=>({id:t.id,mode:t.config.mode,state:t.state,progress:t.lastProgress||t.lastError||'',result:t.result?.id||t.operation?.receipt?.instanceId||''})),stockSummary:core.stockSummary(state),billingSummaries:Object.fromEntries([14,30,35].map(days=>[days,core.billingSummary(state.bills,days)]))};}
 function emit(){if(win&&!win.isDestroyed())win.webContents.send('state',publicState());updateTray();}
 function log(message){state.logs.unshift({time:new Date().toLocaleTimeString('zh-CN'),message});state.logs=state.logs.slice(0,150);emit();}
-function notify(message){if(Notification.isSupported())new Notification({title:'AutoDL Companion',body:message}).show();}
+function notify(message){if(Notification.isSupported())new Notification({title:'autoautodl',body:message,icon:appIcon}).show();}
 function halt(){generation++;clearTimeout(timer);clearTimeout(dataTimer);state.watching=false;state.auto=false;state.nextCheckAt=null;emit();}
 function scheduleDataRefresh(delay=15000){
   clearTimeout(dataTimer);
@@ -368,7 +371,7 @@ async function showLogin(){
 app.whenReady().then(()=>{
   if(!demo){try{const stored=JSON.parse(fs.readFileSync(file(),'utf8'));state.settings=core.settings(stored.settings);state.pending=stored.pending||null;state.oneMachine=stored.oneMachine||null;state.homeTask=stored.homeTask||null;state.homeMode=stored.homeMode||'power';persist();}catch{}}
   else {state.connected=true;state.auth='demo';}
-  win=new BrowserWindow({width:1180,height:820,minWidth:900,minHeight:650,backgroundColor:'#10141f',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  win=new BrowserWindow({title:'autoautodl',icon:appIcon,width:1180,height:820,minWidth:900,minHeight:650,backgroundColor:'#10141f',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   win.webContents.on('will-navigate',e=>e.preventDefault());
   win.on('resize',layoutRent);
@@ -496,10 +499,8 @@ app.whenReady().then(()=>{
     });
   }
   win.on('close',e=>{if(!quitting&&tray){e.preventDefault();win.hide();}});
-  const pixels=Buffer.alloc(32*32*4);
-  for(let y=0;y<32;y++)for(let x=0;x<32;x++){const k=(y*32+x)*4;pixels[k]=229;pixels[k+1]=125;pixels[k+2]=80;pixels[k+3]=(Math.abs(x-16)+Math.abs(y-16)<14)?255:0;}
-  const icon=nativeImage.createFromBitmap(pixels,{width:32,height:32});
-  tray=new Tray(icon);tray.setToolTip('AutoDL Companion');updateTray();tray.on('double-click',()=>win.show());
+  const icon=nativeImage.createFromPath(appIcon).resize({width:32,height:32});
+  tray=new Tray(icon);tray.setToolTip('autoautodl');updateTray();tray.on('double-click',()=>win.show());
   ipcMain.handle('command',async(event,action,payload)=>{
     if(event.sender!==win.webContents)throw new Error('无效请求来源');
     try{
